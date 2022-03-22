@@ -32,7 +32,7 @@ type StandardHttpResponse struct {
 	Payload   any    `json:"payload"`
 }
 
-func HttpResponseWriter(w http.ResponseWriter, status int, contentType string, payload any) {
+func HttpResponseWriter(w http.ResponseWriter, status int, payload any) {
 	shr := &StandardHttpResponse{
 		RequestId: uuid.New().String(),
 		Timestamp: time.Now().String(),
@@ -42,21 +42,21 @@ func HttpResponseWriter(w http.ResponseWriter, status int, contentType string, p
 		fmt.Println(err)
 		return
 	}
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	io.WriteString(w, string(resp))
 }
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
 	// Just respond with a "pong!"
-	HttpResponseWriter(w, http.StatusOK, `application/json`, &PingPayload{Response: "pong!"})
+	HttpResponseWriter(w, http.StatusOK, &PingPayload{Response: "pong!"})
 }
 
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	// Do whatever needed to run health checks
 	// In the future we could report back on the status of our DB, or our cache
 	// (e.g. Redis) by performing a simple PING, and include them in the response.
-	HttpResponseWriter(w, http.StatusOK, `application/json`, &HealthPayload{Healthy: true})
+	HttpResponseWriter(w, http.StatusOK, &HealthPayload{Healthy: true})
 }
 
 func main() {
