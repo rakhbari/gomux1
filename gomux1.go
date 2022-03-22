@@ -32,15 +32,11 @@ type StandardHttpResponse struct {
 	Payload   any    `json:"payload"`
 }
 
-func (shr *StandardHttpResponse) build(payload any) *StandardHttpResponse {
-	shr.RequestId = uuid.New().String()
-	shr.Timestamp = time.Now().String()
-	shr.Payload = payload
-	return shr
-}
-
 func HttpResponseWriter(w http.ResponseWriter, status int, contentType string, payload any) {
-	shr := new(StandardHttpResponse).build(payload)
+	shr := &StandardHttpResponse{
+		RequestId: uuid.New().String(),
+		Timestamp: time.Now().String(),
+		Payload:   payload}
 	resp, err := json.Marshal(shr)
 	if err != nil {
 		fmt.Println(err)
