@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -11,19 +12,57 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
 )
 
-func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	// A very simple health check.
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+type HealthPayload struct {
+	Healthy bool `json:"healthy"`
+}
 
+type PingPayload struct {
+	Response string `json:"response"`
+}
+
+type StandardHttpResponse struct {
+	RequestId string `json:"requestId"`
+	Timestamp string `json:"timestamp"`
+	Payload   any    `json:"payload"`
+}
+
+func (shr *StandardHttpResponse) build(payload any) *StandardHttpResponse {
+	shr.RequestId = uuid.New().String()
+	shr.Timestamp = time.Now().String()
+	shr.Payload = payload
+	return shr
+}
+
+func HttpResponseWriter(w http.ResponseWriter, status int, contentType string, payload any) {
+	shr := new(StandardHttpResponse).build(payload)
+	resp, err := json.Marshal(shr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(status)
+	io.WriteString(w, string(resp))
+}
+
+func PingHandler(w http.ResponseWriter, r *http.Request) {
+	// Do whatever needed to run health checks
 	// In the future we could report back on the status of our DB, or our cache
 	// (e.g. Redis) by performing a simple PING, and include them in the response.
-	io.WriteString(w, `{"healthy": true}`)
+	HttpResponseWriter(w, http.StatusOK, `application/json`, &PingPayload{Response: "pong!"})
+}
+
+func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	// Do whatever needed to run health checks
+	// In the future we could report back on the status of our DB, or our cache
+	// (e.g. Redis) by performing a simple PING, and include them in the response.
+	HttpResponseWriter(w, http.StatusOK, `application/json`, &HealthPayload{Healthy: true})
 }
 
 func main() {
@@ -41,7 +80,8 @@ func main() {
 
 	router := mux.NewRouter()
 	// Add routes
-	router.HandleFunc("/health", HealthCheckHandler)
+	router.HandleFunc("/ping", PingHandler).Methods("GET")
+	router.HandleFunc("/health", HealthCheckHandler).Methods("GET")
 
 	srv := &http.Server{
 		Addr: addr,
