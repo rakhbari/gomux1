@@ -52,9 +52,7 @@ func HttpResponseWriter(w http.ResponseWriter, status int, contentType string, p
 }
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
-	// Do whatever needed to run health checks
-	// In the future we could report back on the status of our DB, or our cache
-	// (e.g. Redis) by performing a simple PING, and include them in the response.
+	// Just respond with a "pong!"
 	HttpResponseWriter(w, http.StatusOK, `application/json`, &PingPayload{Response: "pong!"})
 }
 
