@@ -25,6 +25,12 @@ Very simple server startup
 ./gomux1
 ```
 
+## Test
+As this is a very basic example app, the tests in `gomux1_test.go` don't do any extensive testing other than record the `content-type` and `status` code of the endpoints. But to run the tests in verbose mode:
+```
+go test -v
+```
+
 ## Endpoints
 2 endpoints are currently coded:
 1. `ping`: Responds with a payload object of `response: pong!`
