@@ -59,6 +59,32 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	HttpResponseWriter(w, http.StatusOK, &HealthPayload{Healthy: true})
 }
 
+func processError(err error) {
+	fmt.Println(err)
+	os.Exit(2)
+}
+
+func readFile(cfg *Config) {
+	f, err := os.Open("config.yaml")
+	if err != nil {
+		processError(err)
+	}
+	defer f.Close()
+
+	decoder := yaml.NewDecoder(f)
+	err = decoder.Decode(cfg)
+	if err != nil {
+		processError(err)
+	}
+}
+
+func readEnv(cfg *Config) {
+	err := envconfig.Process("", cfg)
+	if err != nil {
+		processError(err)
+	}
+}
+
 func main() {
 	var wait time.Duration
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
@@ -113,30 +139,4 @@ func main() {
 	// to finalize based on context cancellation.
 	log.Println("shutting down")
 	os.Exit(0)
-}
-
-func processError(err error) {
-	fmt.Println(err)
-	os.Exit(2)
-}
-
-func readFile(cfg *Config) {
-	f, err := os.Open("config.yaml")
-	if err != nil {
-		processError(err)
-	}
-	defer f.Close()
-
-	decoder := yaml.NewDecoder(f)
-	err = decoder.Decode(cfg)
-	if err != nil {
-		processError(err)
-	}
-}
-
-func readEnv(cfg *Config) {
-	err := envconfig.Process("", cfg)
-	if err != nil {
-		processError(err)
-	}
 }
