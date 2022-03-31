@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../gomux1-config"
+		}
+	],
+	"settings": {}
+}
