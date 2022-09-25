@@ -100,6 +100,18 @@ func readExecHost() string {
 	return execHost
 }
 
+func configureNewServer(addr string, router *mux.Router, cfg *Config) *http.Server {
+	srv := &http.Server{
+		Addr: addr,
+		// Good practice to set timeouts to avoid Slowloris attacks.
+		WriteTimeout: time.Second * cfg.Server.WriteTimeout,
+		ReadTimeout:  time.Second * cfg.Server.ReadTimeout,
+		IdleTimeout:  time.Second * cfg.Server.IdleTimeout,
+		Handler:      router, // Pass in our instance of gorilla/mux.Router
+	}
+	return srv
+}
+
 func main() {
 	var wait time.Duration
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
@@ -111,26 +123,28 @@ func main() {
 	readEnv(&cfg)
 	log.Printf("App config from config.yaml: %+v\n", cfg)
 
-	addr := cfg.Server.Host + ":" + cfg.Server.Port
+	httpAddr := cfg.Server.Host + ":" + cfg.Server.HttpPort
+	httpsAddr := cfg.Server.Host + ":" + cfg.Server.HttpsPort
 
 	router := mux.NewRouter()
 	// Add routes
 	router.HandleFunc("/ping", PingHandler).Methods("GET")
 	router.HandleFunc("/health", HealthCheckHandler).Methods("GET")
 
-	srv := &http.Server{
-		Addr: addr,
-		// Good practice to set timeouts to avoid Slowloris attacks.
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-		Handler:      router, // Pass our instance of gorilla/mux in.
-	}
-
-	// Run our server in a goroutine so that it doesn't block.
+	httpSrv := configureNewServer(httpAddr, router, &cfg)
+	// Run our HTTP server in a goroutine so that it doesn't block.
 	go func() {
-		log.Println("Starting server ...")
-		if err := srv.ListenAndServe(); err != nil {
+		log.Println("===> Starting HTTP server ...")
+		if err := httpSrv.ListenAndServe(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	httpsSrv := configureNewServer(httpsAddr, router, &cfg)
+	// Run our TLS server in a goroutine so that it doesn't block.
+	go func() {
+		log.Println("===> Starting HTTPS server ...")
+		if err := httpsSrv.ListenAndServeTLS(cfg.Server.CaCertPath, cfg.Server.CaKeyPath); err != nil {
 			log.Println(err)
 		}
 	}()
@@ -146,12 +160,15 @@ func main() {
 	// Create a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
+	
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
-	srv.Shutdown(ctx)
+	httpSrv.Shutdown(ctx)
+	httpsSrv.Shutdown(ctx)
+	
 	// Optionally, you could run srv.Shutdown in a goroutine and block on
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.
-	log.Println("shutting down")
+	log.Println("===> Shutting down")
 	os.Exit(0)
 }
