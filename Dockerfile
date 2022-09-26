@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.18-alpine
+FROM golang:1.19-alpine
 
 WORKDIR /app
 
@@ -14,5 +14,6 @@ COPY config.yaml ./
 RUN go build .
 
 EXPOSE 8080
+EXPOSE 8443
 
 ENTRYPOINT [ "./gomux1" ]
