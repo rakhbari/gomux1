@@ -14,8 +14,7 @@ import (
 
     "github.com/google/uuid"
     "github.com/gorilla/mux"
-    "github.com/kelseyhightower/envconfig"
-    "gopkg.in/yaml.v2"
+    "github.com/AbsaOSS/env-binder/env"
 )
 
 type HealthPayload struct {
@@ -72,19 +71,6 @@ func readFile(cfg *Config) {
         processError(err)
     }
     defer f.Close()
-
-    decoder := yaml.NewDecoder(f)
-    err = decoder.Decode(cfg)
-    if err != nil {
-        processError(err)
-    }
-}
-
-func readEnv(cfg *Config) {
-    err := envconfig.Process("", cfg)
-    if err != nil {
-        processError(err)
-    }
 }
 
 func readExecHost() string {
@@ -104,10 +90,10 @@ func configureNewServer(addr string, router *mux.Router, cfg *Config) *http.Serv
     srv := &http.Server{
         Addr: addr,
         // Good practice to set timeouts to avoid Slowloris attacks.
-        WriteTimeout: time.Second * cfg.Server.WriteTimeout,
-        ReadTimeout:  time.Second * cfg.Server.ReadTimeout,
-        IdleTimeout:  time.Second * cfg.Server.IdleTimeout,
-        Handler:      router, // Pass in our instance of gorilla/mux.Router
+        WriteTimeout:   time.Duration(cfg.Server.WriteTimeout) * time.Second,
+        ReadTimeout:    time.Duration(cfg.Server.ReadTimeout) * time.Second,
+        IdleTimeout:    time.Duration(cfg.Server.IdleTimeout) * time.Second,
+        Handler:        router, // Pass in our instance of gorilla/mux.Router
     }
     return srv
 }
@@ -118,20 +104,21 @@ func main() {
     flag.Parse()
 
     // Read in the config file or env variables
-    var cfg Config
-    readFile(&cfg)
-    readEnv(&cfg)
-    log.Printf("App config from config.yaml: %+v\n", cfg)
+    cfg := &Config{}
+    if err := env.Bind(cfg); err != nil {
+        processError(err)
+    }
+    log.Printf("===> App config: %+v\n", cfg)
 
-    httpAddr := cfg.Server.Host + ":" + cfg.Server.HttpPort
-    httpsAddr := cfg.Server.Host + ":" + cfg.Server.HttpsPort
+    httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpPort)
+    httpsAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpsPort)
 
     router := mux.NewRouter()
     // Add routes
     router.HandleFunc("/ping", PingHandler).Methods("GET")
     router.HandleFunc("/health", HealthCheckHandler).Methods("GET")
 
-    httpSrv := configureNewServer(httpAddr, router, &cfg)
+    httpSrv := configureNewServer(httpAddr, router, cfg)
     // Run our HTTP server in a goroutine so that it doesn't block.
     go func() {
         log.Println("===> Starting HTTP server ...")
@@ -140,7 +127,7 @@ func main() {
         }
     }()
 
-    httpsSrv := configureNewServer(httpsAddr, router, &cfg)
+    httpsSrv := configureNewServer(httpsAddr, router, cfg)
     // Run our TLS server in a goroutine so that it doesn't block.
     go func() {
         log.Println("===> Starting HTTPS server ...")
