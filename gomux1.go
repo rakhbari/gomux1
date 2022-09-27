@@ -1,11 +1,13 @@
 package main
 
 import (
+    "bytes"
     "context"
     "encoding/json"
     "flag"
     "fmt"
     "io"
+    "io/ioutil"
     "log"
     "net/http"
     "os"
@@ -15,6 +17,7 @@ import (
     "github.com/google/uuid"
     "github.com/gorilla/mux"
     "github.com/AbsaOSS/env-binder/env"
+    "github.com/spf13/afero"
 )
 
 type HealthPayload struct {
@@ -65,12 +68,38 @@ func processError(err error) {
     os.Exit(2)
 }
 
-func readFile(cfg *Config) {
-    f, err := os.Open("config.yaml")
+func getTlsCertBundleFile(cfg *Config, appFS afero.Fs) string {
+    if len(cfg.Server.tlsCaPaths) == 0 {
+        fmt.Println("---> No tlsCaPaths - returning tlsCertPath ...")
+        return cfg.Server.tlsCertPath
+    }
+    fmt.Printf("---> tlsCaPaths len: %d\n", len(cfg.Server.tlsCaPaths))
+    caCertPaths := []string{cfg.Server.tlsCertPath} // New []string initialized with value of the "leaf" cert
+    caCertPaths = append(caCertPaths, cfg.Server.tlsCaPaths...) // Append the tlsCaPaths to it
+    fmt.Printf("---> Processing caCertPaths: %+v\n", caCertPaths)
+
+    // Loop through caCertPaths and concat all their content into bundleData
+    var bundleData bytes.Buffer
+    for _, filePath := range caCertPaths {
+        fmt.Printf("------> Reading filePath: \"%+v\"\n", filePath)
+        data, err := ioutil.ReadFile(filePath)
+        if err != nil {
+            processError(err)
+        }
+
+        bundleData.Write(data)
+    }
+    
+    appFS.MkdirAll("temp/", 0755)
+    err := afero.WriteFile(appFS, "temp/tlsCertBundle", bundleData.Bytes(), 0644)
     if err != nil {
         processError(err)
     }
-    defer f.Close()
+    _, err = appFS.Stat("temp/tlsCertBundle")
+    if os.IsNotExist(err) {
+        fmt.Printf("file \"%s\" does not exist.\n", "temp/tlsCertBundle")
+    }
+    return "temp/tlsCertBundle"
 }
 
 func readExecHost() string {
@@ -131,7 +160,8 @@ func main() {
     // Run our TLS server in a goroutine so that it doesn't block.
     go func() {
         log.Println("===> Starting HTTPS server ...")
-        if err := httpsSrv.ListenAndServeTLS(cfg.Server.CaCertPath, cfg.Server.CaKeyPath); err != nil {
+        appFS := afero.NewMemMapFs()
+        if err := httpsSrv.ListenAndServeTLS(getTlsCertBundleFile(cfg, appFS), cfg.Server.tlsKeyPath); err != nil {
             log.Println(err)
         }
     }()
