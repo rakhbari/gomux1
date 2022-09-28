@@ -5,8 +5,8 @@ type Config struct {
         Host string `env:"SERVER_HOST, default=0.0.0.0"`
         HttpPort int `env:"SERVER_HTTP_PORT, default=8080"`
         HttpsPort int `env:"SERVER_HTTPS_PORT, default=8443"`
-        TlsCertPath string `env:"SERVER_TLS_CERT_PATH, require=true"`
-        TlsKeyPath string `env:"SERVER_TLS_KEY_PATH, require=true"`
+        TlsCertPath string `env:"SERVER_TLS_CERT_PATH"`
+        TlsKeyPath string `env:"SERVER_TLS_KEY_PATH"`
         TlsCaPaths []string `env:"SERVER_TLS_CA_PATHS"`
         WriteTimeout int `env:"SERVER_WRITE_TIMEOUT, default=15"`
         ReadTimeout int `env:"SERVER_READ_TIMEOUT, default=15"`
