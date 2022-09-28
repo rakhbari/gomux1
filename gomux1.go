@@ -127,19 +127,23 @@ func main() {
             log.Println(err)
         }
     }()
-
-    httpsSrv := configureNewServer(httpsAddr, router, cfg)
-    // Run our TLS server in a goroutine so that it doesn't block.
-    go func() {
-        tlsCertFile := utils.GetTlsCertBundleFile(cfg)
-        log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", tlsCertFile)
-        if err := httpsSrv.ListenAndServeTLS(tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
-            if !strings.Contains(strings.ToLower(err.Error()), "server closed") {
-                utils.ProcessError(err)
+    
+    // If TlsCertPath is passed in, start a TLS server also
+    var httpsSrv *http.Server
+    if len(cfg.Server.TlsCertPath) > 0 {
+        httpsSrv = configureNewServer(httpsAddr, router, cfg)
+        // Run our TLS server in a goroutine so that it doesn't block.
+        go func() {
+            tlsCertFile := utils.GetTlsCertBundleFile(cfg)
+            log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", tlsCertFile)
+            if err := httpsSrv.ListenAndServeTLS(tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
+                if !strings.Contains(strings.ToLower(err.Error()), "server closed") {
+                    utils.ProcessError(err)
+                }
             }
-        }
-        cleanup(tlsCertFile)
-    }()
+            cleanup(tlsCertFile)
+        }()
+    }
 
     c := make(chan os.Signal, 1)
     // We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
@@ -155,12 +159,14 @@ func main() {
     
     // Doesn't block if no connections, but will otherwise wait
     // until the timeout deadline.
+    log.Println("===> Shutting down")
     httpSrv.Shutdown(ctx)
-    httpsSrv.Shutdown(ctx)
+    if len(cfg.Server.TlsCertPath) > 0 {
+        httpsSrv.Shutdown(ctx)
+    }
 
     // Optionally, you could run srv.Shutdown in a goroutine and block on
     // <-ctx.Done() if your application should wait for other services
     // to finalize based on context cancellation.
-    log.Println("===> Shutting down")
     os.Exit(0)
 }
