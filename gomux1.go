@@ -1,23 +1,24 @@
 package main
 
 import (
-    "bytes"
     "context"
     "encoding/json"
     "flag"
     "fmt"
     "io"
-    "io/ioutil"
     "log"
     "net/http"
     "os"
     "os/signal"
+    "strings"
     "time"
 
     "github.com/google/uuid"
     "github.com/gorilla/mux"
     "github.com/AbsaOSS/env-binder/env"
-    "github.com/spf13/afero"
+
+    "github.com/rakhbari/gomux1/config"
+    "github.com/rakhbari/gomux1/utils"
 )
 
 type HealthPayload struct {
@@ -63,45 +64,6 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
     HttpResponseWriter(w, http.StatusOK, &HealthPayload{Healthy: true})
 }
 
-func processError(err error) {
-    fmt.Println(err)
-    os.Exit(2)
-}
-
-func getTlsCertBundleFile(cfg *Config, appFS afero.Fs) string {
-    if len(cfg.Server.tlsCaPaths) == 0 {
-        fmt.Println("---> No tlsCaPaths - returning tlsCertPath ...")
-        return cfg.Server.tlsCertPath
-    }
-    fmt.Printf("---> tlsCaPaths len: %d\n", len(cfg.Server.tlsCaPaths))
-    caCertPaths := []string{cfg.Server.tlsCertPath} // New []string initialized with value of the "leaf" cert
-    caCertPaths = append(caCertPaths, cfg.Server.tlsCaPaths...) // Append the tlsCaPaths to it
-    fmt.Printf("---> Processing caCertPaths: %+v\n", caCertPaths)
-
-    // Loop through caCertPaths and concat all their content into bundleData
-    var bundleData bytes.Buffer
-    for _, filePath := range caCertPaths {
-        fmt.Printf("------> Reading filePath: \"%+v\"\n", filePath)
-        data, err := ioutil.ReadFile(filePath)
-        if err != nil {
-            processError(err)
-        }
-
-        bundleData.Write(data)
-    }
-    
-    appFS.MkdirAll("temp/", 0755)
-    err := afero.WriteFile(appFS, "temp/tlsCertBundle", bundleData.Bytes(), 0644)
-    if err != nil {
-        processError(err)
-    }
-    _, err = appFS.Stat("temp/tlsCertBundle")
-    if os.IsNotExist(err) {
-        fmt.Printf("file \"%s\" does not exist.\n", "temp/tlsCertBundle")
-    }
-    return "temp/tlsCertBundle"
-}
-
 func readExecHost() string {
     execHost := os.Getenv("POD_NAME")
     if execHost == "" {
@@ -115,7 +77,7 @@ func readExecHost() string {
     return execHost
 }
 
-func configureNewServer(addr string, router *mux.Router, cfg *Config) *http.Server {
+func configureNewServer(addr string, router *mux.Router, cfg *config.Config) *http.Server {
     srv := &http.Server{
         Addr: addr,
         // Good practice to set timeouts to avoid Slowloris attacks.
@@ -127,15 +89,25 @@ func configureNewServer(addr string, router *mux.Router, cfg *Config) *http.Serv
     return srv
 }
 
+func cleanup(tlsCertFile string) {
+    if tlsCertFile != "tlsCertBundle" {
+        return
+    }
+    fmt.Printf("---> Removing file: %s ...\n", tlsCertFile)
+    if err := os.Remove(tlsCertFile); err != nil {
+        utils.ProcessError(err)
+    }
+}
+
 func main() {
     var wait time.Duration
     flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
     flag.Parse()
 
     // Read in the config file or env variables
-    cfg := &Config{}
+    cfg := &config.Config{}
     if err := env.Bind(cfg); err != nil {
-        processError(err)
+        utils.ProcessError(err)
     }
     log.Printf("===> App config: %+v\n", cfg)
 
@@ -159,11 +131,14 @@ func main() {
     httpsSrv := configureNewServer(httpsAddr, router, cfg)
     // Run our TLS server in a goroutine so that it doesn't block.
     go func() {
-        log.Println("===> Starting HTTPS server ...")
-        appFS := afero.NewMemMapFs()
-        if err := httpsSrv.ListenAndServeTLS(getTlsCertBundleFile(cfg, appFS), cfg.Server.tlsKeyPath); err != nil {
-            log.Println(err)
+        tlsCertFile := utils.GetTlsCertBundleFile(cfg)
+        log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", tlsCertFile)
+        if err := httpsSrv.ListenAndServeTLS(tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
+            if !strings.Contains(strings.ToLower(err.Error()), "server closed") {
+                utils.ProcessError(err)
+            }
         }
+        cleanup(tlsCertFile)
     }()
 
     c := make(chan os.Signal, 1)
@@ -182,7 +157,7 @@ func main() {
     // until the timeout deadline.
     httpSrv.Shutdown(ctx)
     httpsSrv.Shutdown(ctx)
-    
+
     // Optionally, you could run srv.Shutdown in a goroutine and block on
     // <-ctx.Done() if your application should wait for other services
     // to finalize based on context cancellation.
