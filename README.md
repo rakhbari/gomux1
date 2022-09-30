@@ -53,6 +53,11 @@ There is a Docker file in the repo which will build & run the app.
 docker build -t akcn/gomux1:latest .
 ```
 
+* Docker run with only the HTTP server on the default port `8080`:
+```
+docker run --rm -p 8080:8080 akcn/gomux1:latest
+```
+
 * Docker run with a TLS bundle chain cert file:
 ```
 docker run --rm -p 8080:8080 -p 8443:8443 \
