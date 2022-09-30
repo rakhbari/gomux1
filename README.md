@@ -48,6 +48,11 @@ SERVER_TLS_CERT_PATH="../openssl-cert/leaf.crt" SERVER_TLS_KEY_PATH="../openssl-
 ## Docker build/run
 There is a Docker file in the repo which will build & run the app.
 
+* Docker build:
+```
+docker build -t akcn/gomux1:latest .
+```
+
 * Docker run with a TLS bundle chain cert file:
 ```
 docker run --rm -p 8080:8080 -p 8443:8443 \
