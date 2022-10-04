@@ -1,6 +1,7 @@
 package utils
 
 import (
+    "errors"
     "fmt"
     "bytes"
     "os"
@@ -13,10 +14,14 @@ func ProcessError(err error) {
     os.Exit(1)
 }
 
-func GetTlsCertBundleFile(cfg *config.Config) string {
+func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
     if len(cfg.Server.TlsCaPaths) == 0 {
-        fmt.Println("---> No tlsCaPaths - returning cfg.Server.TlsCertPath ...")
-        return cfg.Server.TlsCertPath
+        fmt.Println("---> No tlsCaPaths provided - Checking TlsCertPath ...")
+        if _, err := os.Stat(cfg.Server.TlsCertPath); errors.Is(err, os.ErrNotExist) {
+            fmt.Printf("!!!!!!> ERROR: File \"%+v\" doesn't exist! Returning ...\n", cfg.Server.TlsCertPath)
+            return nil
+        }
+        return &cfg.Server.TlsCertPath
     }
     caCertPaths := []string{cfg.Server.TlsCertPath} // Initialize with value of the "leaf" cert
     caCertPaths = append(caCertPaths, cfg.Server.TlsCaPaths...) // Append the tlsCaPaths to it
@@ -26,6 +31,10 @@ func GetTlsCertBundleFile(cfg *config.Config) string {
     var bundleData bytes.Buffer
     for _, filePath := range caCertPaths {
         fmt.Printf("------> Reading filePath: \"%+v\"\n", filePath)
+        if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
+            fmt.Printf("!!!!!!> ERROR: File \"%+v\" doesn't exist! Returning ...\n", filePath)
+            return nil
+        }
         data, err := os.ReadFile(filePath)
         if err != nil {
             ProcessError(err)
@@ -40,6 +49,6 @@ func GetTlsCertBundleFile(cfg *config.Config) string {
         ProcessError(err)
     }
 
-    return tlsCertBundle
+    return &tlsCertBundle
 }
 

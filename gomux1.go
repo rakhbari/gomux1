@@ -135,13 +135,17 @@ func main() {
         // Run our TLS server in a goroutine so that it doesn't block.
         go func() {
             tlsCertFile := utils.GetTlsCertBundleFile(cfg)
-            log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", tlsCertFile)
-            if err := httpsSrv.ListenAndServeTLS(tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
+            if tlsCertFile == nil {
+                log.Println("!!!> ERROR: Problem encountered while loading TLS cert files. Not starting TLS server!")
+                return
+            }
+            log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", *tlsCertFile)
+            if err := httpsSrv.ListenAndServeTLS(*tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
                 if !strings.Contains(strings.ToLower(err.Error()), "server closed") {
                     utils.ProcessError(err)
                 }
             }
-            cleanup(tlsCertFile)
+            cleanup(*tlsCertFile)
         }()
     }
 
