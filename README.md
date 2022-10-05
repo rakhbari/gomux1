@@ -86,6 +86,21 @@ docker run --rm -p 8080:8080 -p 8443:8443 \
   akcn/gomux1:latest
 ```
 
+And if you'r adding the `SERVER_TEMP_DIR` env var, you'll need to define the `/temp` volume to the `docker run` cmd:
+```
+docker run --rm -p 8080:8080 -p 8443:8443 \
+  -v ${PWD}/../openssl-cert/leaf.crt:/cert.pem \
+  -v ${PWD}/../openssl-cert/ca_intermediate.crt:/ca_cert1.pem \
+  -v ${PWD}/../openssl-cert/ca_root.crt:/ca_cert2.pem \
+  -v ${PWD}/../openssl-cert/ca_intermediate_unencrypted.key:/cert.key \
+  -v /home/ramin/temp/server:/temp \
+  -e SERVER_TLS_CERT_PATH="/cert.pem" \
+  -e SERVER_TLS_KEY_PATH="/cert.key" \
+  -e SERVER_TLS_CA_PATHS="/ca_cert1.pem,/ca_cert2.pem" \
+  -e SERVER_TEMP_DIR="/temp" \
+  akcn/gomux1:latest
+```
+
 ## Test
 As this is a very basic example app, the tests in `gomux1_test.go` don't do any extensive testing other than record the `content-type` and `status` code of the endpoints. But to run the tests in verbose mode:
 ```
