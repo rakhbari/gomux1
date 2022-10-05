@@ -90,7 +90,7 @@ func configureNewServer(addr string, router *mux.Router, cfg *config.Config) *ht
 }
 
 func cleanup(tlsCertFile string) {
-    if tlsCertFile != "tlsCertBundle" {
+    if !strings.HasSuffix(tlsCertFile, "tlsCertBundle") {
         return
     }
     fmt.Printf("---> Removing file: %s ...\n", tlsCertFile)
