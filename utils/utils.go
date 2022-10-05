@@ -2,11 +2,9 @@ package utils
 
 import (
     "errors"
-    "path/filepath"
     "fmt"
     "bytes"
     "os"
-    "strings"
 
     "github.com/rakhbari/gomux1/config"
 )
@@ -31,7 +29,6 @@ func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
 
     // Loop through caCertPaths and concat all their content into bundleData
     var bundleData bytes.Buffer
-    tlsCertBundleDir := "."
     for _, filePath := range caCertPaths {
         fmt.Printf("------> Reading filePath: \"%+v\"\n", filePath)
         if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
@@ -43,13 +40,9 @@ func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
             ProcessError(err)
         }
         bundleData.Write(data)
-
-        if strings.Contains(filePath, "/server/") {
-            tlsCertBundleDir = filepath.Dir(filePath)
-        }
     }
 
-    tlsCertBundle := tlsCertBundleDir + "/tlsCertBundle"
+    tlsCertBundle := cfg.Server.TempDir + "/tlsCertBundle"
     err := os.WriteFile(tlsCertBundle, bundleData.Bytes(), 0644)
     if err != nil {
         ProcessError(err)
@@ -57,4 +50,3 @@ func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
 
     return &tlsCertBundle
 }
-

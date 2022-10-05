@@ -11,6 +11,7 @@ type Config struct {
         WriteTimeout int `env:"SERVER_WRITE_TIMEOUT, default=15"`
         ReadTimeout int `env:"SERVER_READ_TIMEOUT, default=15"`
         IdleTimeout int `env:"SERVER_IDLE_TIMEOUT, default=60"`
+        TempDir string `env:"SERVER_TEMP_DIR, default=."`
     }
     
     // Database struct {

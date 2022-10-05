@@ -45,6 +45,11 @@ SERVER_TLS_CERT_PATH="../openssl-cert/ca_chain-bundle.crt" SERVER_TLS_KEY_PATH="
 SERVER_TLS_CERT_PATH="../openssl-cert/leaf.crt" SERVER_TLS_KEY_PATH="../openssl-cert/ca_intermediate_unencrypted.key" SERVER_TLS_CA_PATHS="../openssl-cert/ca_intermediate.crt,../openssl-cert/ca_root.crt" ./gomux1
 ```
 
+If you use the 2nd method with `SERVER_TLS_CA_PATHS`, the app needs to create a temporary `tlsCertBundle` file. By default it creates this file in the localy directory (`./`) where you're running the app, but you can override this with the `SERVER_TEMP_DIR` env variable:
+```
+SERVER_TEMP_DIR="/path/to/temp/dir" ./gomux1
+```
+
 ## Docker build/run
 There is a Docker file in the repo which will build & run the app.
 
