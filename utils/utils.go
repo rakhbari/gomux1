@@ -14,7 +14,7 @@ func ProcessError(err error) {
     os.Exit(1)
 }
 
-func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
+func GetTlsCertFile(cfg *config.Config) (tlsCertFile *string) {
     if len(cfg.Server.TlsCaPaths) == 0 {
         fmt.Println("---> No tlsCaPaths provided - Checking TlsCertPath ...")
         if _, err := os.Stat(cfg.Server.TlsCertPath); errors.Is(err, os.ErrNotExist) {
@@ -37,7 +37,8 @@ func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
         }
         data, err := os.ReadFile(filePath)
         if err != nil {
-            ProcessError(err)
+            fmt.Printf("!!!!!!> ERROR: %v", err)
+            return nil
         }
         bundleData.Write(data)
     }
@@ -45,7 +46,8 @@ func GetTlsCertBundleFile(cfg *config.Config) (tlsCertFile *string) {
     tlsCertBundle := cfg.Server.TempDir + "/tlsCertBundle"
     err := os.WriteFile(tlsCertBundle, bundleData.Bytes(), 0644)
     if err != nil {
-        ProcessError(err)
+        fmt.Printf("!!!!!!> ERROR: %v", err)
+        return nil
     }
 
     return &tlsCertBundle

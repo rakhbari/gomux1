@@ -134,7 +134,7 @@ func main() {
         httpsSrv = configureNewServer(httpsAddr, router, cfg)
         // Run our TLS server in a goroutine so that it doesn't block.
         go func() {
-            tlsCertFile := utils.GetTlsCertBundleFile(cfg)
+            tlsCertFile := utils.GetTlsCertFile(cfg)
             if tlsCertFile == nil {
                 log.Println("!!!> ERROR: Problem encountered while loading TLS cert files. Not starting TLS server!")
                 return
