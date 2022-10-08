@@ -1,3 +1,4 @@
 gomux1
 *.exe
 tlsCertBundle
+version.json
