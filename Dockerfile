@@ -10,11 +10,12 @@ RUN addgroup -g 10000 gomux1 && \
     adduser -D --uid=10000 --ingroup=gomux1 gomux1
 
 # add make tool
-RUN apk add --update make
+RUN apk add --update git make
 
 WORKDIR /build
 
 COPY . .
+COPY ./.git /build/.git
 
 RUN make build
 
