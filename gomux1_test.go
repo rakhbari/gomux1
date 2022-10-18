@@ -50,16 +50,6 @@ func TestPingHandler(t *testing.T) {
 		t.Errorf("Got error while trying to unmarshal the response. Error: %+v", err)
 	}
 	t.Logf("resp: %+v", resp)
-
-}
-
-func checkPingResponse(resp *ExpectedHttpResponse, t *testing.T) {
-	if len(resp.RequestId) < 36 {
-		t.Errorf("Received RequestId is not the correct length (< 36): \"%+v\"", resp.RequestId)
-	}
-	//if resp.Payload["response"] != "pong!" {
-	//
-	//}
 }
 
 func TestHealthCheckHandler(t *testing.T) {
