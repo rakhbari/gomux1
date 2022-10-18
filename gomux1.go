@@ -21,30 +21,36 @@ import (
 	"github.com/rakhbari/gomux1/utils"
 )
 
-type HealthPayload struct {
-	Healthy bool `json:"healthy"`
-}
-
 type PingPayload struct {
 	Response string `json:"response"`
 }
 
-type StandardHttpResponse struct {
-	RequestId string `json:"requestId"`
-	Timestamp string `json:"timestamp"`
-	ExecHost  string `json:"execHost"`
-	Payload   any    `json:"payload"`
+type HealthPayload struct {
+	Healthy bool `json:"healthy"`
 }
 
-func HttpResponseWriter(w http.ResponseWriter, status int, payload any) {
-	shr := &StandardHttpResponse{
-		RequestId: uuid.New().String(),
-		Timestamp: time.Now().String(),
-		ExecHost:  readExecHost(),
-		Payload:   payload}
-	resp, err := json.Marshal(shr)
+type StandardApiResponse struct {
+	RequestId string  `json:"requestId"`
+	Timestamp string  `json:"timestamp"`
+	ExecHost  string  `json:"execHost"`
+	Payload   any     `json:"payload"`
+	Errors    []Error `json:"errors"`
+}
+
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Detail  string `json:"detail"`
+	HelpUrl string `json:"helpUrl"`
+}
+
+func HttpResponseWriter(w http.ResponseWriter, status int, apiResp *StandardApiResponse) {
+	apiResp.RequestId = uuid.New().String()
+	apiResp.Timestamp = time.Now().String()
+	apiResp.ExecHost = readExecHost()
+	resp, err := json.Marshal(apiResp)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("!!!> ERROR: json.Marshall failed: %v", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -54,14 +60,16 @@ func HttpResponseWriter(w http.ResponseWriter, status int, payload any) {
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
 	// Just respond with a "pong!"
-	HttpResponseWriter(w, http.StatusOK, &PingPayload{Response: "pong!"})
+	apiResponse := &StandardApiResponse{Payload: PingPayload{Response: "pong!"}}
+	HttpResponseWriter(w, http.StatusOK, apiResponse)
 }
 
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	// Do whatever needed to run health checks
 	// In the future we could report back on the status of our DB, or our cache
 	// (e.g. Redis) by performing a simple PING, and include them in the response.
-	HttpResponseWriter(w, http.StatusOK, &HealthPayload{Healthy: true})
+	apiResponse := &StandardApiResponse{Payload: HealthPayload{Healthy: true}}
+	HttpResponseWriter(w, http.StatusOK, apiResponse)
 }
 
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +79,7 @@ func VersionHandler(w http.ResponseWriter, r *http.Request) {
 		responseStatus = http.StatusNotFound
 	}
 	// Responds with the value of the utils.Version struct loaded at app startup
-	HttpResponseWriter(w, responseStatus, &version)
+	HttpResponseWriter(w, responseStatus, &StandardApiResponse{Payload: &version})
 }
 
 func readExecHost() string {
@@ -87,8 +95,17 @@ func readExecHost() string {
 	return execHost
 }
 
-func configureNewServer(addr string, router *mux.Router, cfg *config.Config) *http.Server {
-	srv := &http.Server{
+func ConfigureAppRouter() *mux.Router {
+	router := mux.NewRouter()
+	// Add routes
+	router.HandleFunc("/v1/ping", PingHandler).Methods("GET")
+	router.HandleFunc("/health", HealthCheckHandler).Methods("GET")
+	router.HandleFunc("/version", VersionHandler).Methods("GET")
+	return router
+}
+
+func configureAppServer(addr string, router *mux.Router, cfg *config.Config) *http.Server {
+	return &http.Server{
 		Addr: addr,
 		// Good practice to set timeouts to avoid Slowloris attacks.
 		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
@@ -96,7 +113,6 @@ func configureNewServer(addr string, router *mux.Router, cfg *config.Config) *ht
 		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 		Handler:      router, // Pass in our instance of gorilla/mux.Router
 	}
-	return srv
 }
 
 func cleanup(tlsCertFile string) {
@@ -130,13 +146,9 @@ func main() {
 	httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpPort)
 	httpsAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.HttpsPort)
 
-	router := mux.NewRouter()
-	// Add routes
-	router.HandleFunc("/v1/ping", PingHandler).Methods("GET")
-	router.HandleFunc("/health", HealthCheckHandler).Methods("GET")
-	router.HandleFunc("/version", VersionHandler).Methods("GET")
+	router := ConfigureAppRouter()
 
-	httpSrv := configureNewServer(httpAddr, router, cfg)
+	httpSrv := configureAppServer(httpAddr, router, cfg)
 	// Run our HTTP server in a goroutine so that it doesn't block.
 	go func() {
 		log.Println("===> Starting HTTP server ...")
@@ -148,7 +160,7 @@ func main() {
 	// If TlsCertPath is passed in, start a TLS server also
 	var httpsSrv *http.Server
 	if len(cfg.Server.TlsCertPath) > 0 {
-		httpsSrv = configureNewServer(httpsAddr, router, cfg)
+		httpsSrv = configureAppServer(httpsAddr, router, cfg)
 		// Run our TLS server in a goroutine so that it doesn't block.
 		go func() {
 			tlsCertFile := utils.GetTlsCertFile(cfg)
@@ -156,7 +168,7 @@ func main() {
 				log.Println("!!!> ERROR: Problem encountered while loading TLS cert files. Not starting TLS server!")
 				return
 			}
-			log.Printf("===> Starting HTTPS server ... (tlsCertFile: %s)\n", *tlsCertFile)
+			log.Printf("===> Starting TLS server ... (tlsCertFile: %s)\n", *tlsCertFile)
 			if err := httpsSrv.ListenAndServeTLS(*tlsCertFile, cfg.Server.TlsKeyPath); err != nil {
 				if !strings.Contains(strings.ToLower(err.Error()), "server closed") {
 					utils.ProcessError(err)
@@ -180,9 +192,10 @@ func main() {
 
 	// Doesn't block if no connections, but will otherwise wait
 	// until the timeout deadline.
-	log.Println("===> Shutting down")
+	log.Println("===> Shutting down HTTP server ...")
 	httpSrv.Shutdown(ctx)
-	if len(cfg.Server.TlsCertPath) > 0 {
+	if httpsSrv != nil {
+		log.Println("===> Shutting down TLS server ...")
 		httpsSrv.Shutdown(ctx)
 	}
 
