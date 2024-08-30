@@ -31,7 +31,7 @@ func RomanToInt(roman string) (int, error) {
     var subtractors string
     numTotal := 0
 
-    // Validation the length of the pass-in string
+    // Validate the length of the passed-in string is between 1 & 15
     if len(roman) < 1 || len(roman) > 15 {
         return -1, fmt.Errorf("ERROR: Given roman numeral string must be between 0 and 15")
     }
@@ -43,23 +43,22 @@ func RomanToInt(roman string) (int, error) {
         }
 
         if subtractor != 0 {
+            // Previous char was a subtractor. Reduce the value of char by it and loop.
             numTotal += romanValuesMap[char] - romanValuesMap[subtractor]
             subtractor = 0
-        } else {
-            subtractors = subtractersMap[char]
-            // char is not a subtractor
-            if subtractors == "" {
-                numTotal += romanValuesMap[char]
-            } else {
-                // Is there another rune after char and is char a subtractor for that rune?
-                if pos < len(roman)-1 && strings.ContainsRune(subtractors, rune(roman[pos+1])) {
-                    subtractor = char
-                } else {
-                    numTotal += romanValuesMap[char]
-                    subtractor = 0
-                }
-            }
+            continue
         }
+
+        subtractors = subtractersMap[char]
+        // Is there another rune after char and is char a subtractor for that rune?
+        if pos < len(roman)-1 && strings.ContainsRune(subtractors, rune(roman[pos+1])) {
+            subtractor = char
+            continue
+        }
+
+        // char is not a subtractor. Add it to total and loop.
+        numTotal += romanValuesMap[char]
+        subtractor = 0
     }
 
     return numTotal, nil
