@@ -24,13 +24,13 @@ func GetSvcAcctToken(kubeConfigPath string, namespace string, svcAcctName string
 func GetSvcAcctSecret(kubeConfigPath string, namespace string, secretName string) (*corev1.Secret, error) {
     config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
     if err != nil {
-        log.Fatalf("Problem with BuildConfigFromFlags: %v", err)
+        log.Printf("Problem with BuildConfigFromFlags: %v", err)
         return nil, err
     }
 
     k8sClient, err := kubernetes.NewForConfig(config)
     if err != nil {
-        log.Fatalf("Problem with NewForConfig: %v", err)
+        log.Printf("Problem with NewForConfig: %v", err)
         return nil, err
     }
 
