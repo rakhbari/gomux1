@@ -9,6 +9,8 @@ go_build:
 	go build .
 
 go_test:
-	go test . -v
+	go test ./... -v
 
 build: create_version go_build
+
+test: go_test
