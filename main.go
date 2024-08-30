@@ -213,7 +213,7 @@ func main() {
     // SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
     signal.Notify(c, os.Interrupt)
 
-    // Block until we receive our signal.
+    // Block until we receive our os.Signal. (Ctrl-C)
     <-c
 
     // Create a deadline to wait for.
