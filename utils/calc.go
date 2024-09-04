@@ -58,7 +58,6 @@ func RomanToInt(roman string) (int, error) {
 
         // char is not a subtractor. Add it to total and loop.
         numTotal += romanValuesMap[char]
-        subtractor = 0
     }
 
     return numTotal, nil
