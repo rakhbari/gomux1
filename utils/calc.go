@@ -28,7 +28,6 @@ Yes?
 */
 func RomanToInt(roman string) (int, error) {
     var subtractor rune
-    var subtractors string
     numTotal := 0
 
     // Validate the length of the passed-in string is between 1 & 15
@@ -49,9 +48,8 @@ func RomanToInt(roman string) (int, error) {
             continue
         }
 
-        subtractors = subtractersMap[char]
         // Is there another rune after char and is char a subtractor for that rune?
-        if pos < len(roman)-1 && strings.ContainsRune(subtractors, rune(roman[pos+1])) {
+        if pos < len(roman)-1 && strings.ContainsRune(subtractersMap[char], rune(roman[pos+1])) {
             subtractor = char
             continue
         }
