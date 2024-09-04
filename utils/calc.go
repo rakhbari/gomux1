@@ -21,11 +21,6 @@ var subtractersMap = map[rune]string{
     'C': "DM",
 }
 
-/*
-Iterate over runes in the roman numeral string
-Do we have a lastChar -> No? add it to the total
-Yes?
-*/
 func RomanToInt(roman string) (int, error) {
     var subtractor rune
     numTotal := 0
