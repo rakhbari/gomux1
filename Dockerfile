@@ -1,39 +1,32 @@
 # syntax=docker/dockerfile:1
 
 #
-# Larger Golang image as "build"
+# Build stage
 #
-FROM golang:1.19-alpine AS build
+FROM golang:1.24-alpine AS build
 
-# add a user here because addgroup and adduser are not available in scratch
-RUN addgroup -g 10000 gomux1 && \
-    adduser -D --uid=10000 --ingroup=gomux1 gomux1
-
-# add make tool
-RUN apk add --update git make
+# Install make and git
+RUN apk add --no-cache make git
 
 WORKDIR /build
 
 COPY . .
 COPY ./.git /build/.git
 
-RUN make build
+RUN make build && \
+    ls -la gomux1
 
 #
-# Much smaller "final" image to run the app
+# Final stage
 #
-FROM alpine:latest AS final
+FROM alpine:3.19
 
 LABEL maintainer="rakhbari"
 
-# copy users from build image
-COPY --from=build /etc/passwd /etc/passwd
-
 WORKDIR /app
-USER gomux1
 
-COPY --from=build --chown=gomux1:gomux1 /build/gomux1 ./
-COPY --from=build --chown=gomux1:gomux1 /build/*.json ./
+COPY --from=build /build/gomux1 ./
+COPY --from=build /build/*.json ./
 
 EXPOSE 8080
 EXPOSE 8443
