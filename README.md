@@ -27,11 +27,9 @@ go get github.com/rakhbari/gomux1
 ```
 
 ## Run
-The app starts up 2 HTTP servers:
-* A standard HTTP server
-* A TLS-enabled HTTPS server
+The app starts up a standard HTTP server by default. However, if `SERVER_TLS_CERT_PATH` is set, it will also start up a TLS-enabled HTTPS server.
 
-As such, the app requires the TLS certificate and key in one of 2 ways:
+For the HTTPS server, the app requires the TLS certificate and key in one of 2 ways:
 
 * `SERVER_TLS_CERT_PATH` set to a TLS cert bundle file - This file must be a bundle of the "leaf" cert + any CA intermediary certs + the CA root cert, all concatenated into a single file. Example:
 
