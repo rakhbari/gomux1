@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -29,19 +28,31 @@ type PingPayload struct {
 	Response string `json:"response"`
 }
 
-type StandardHttpResponse struct {
-	RequestId string `json:"requestId"`
-	Timestamp string `json:"timestamp"`
-	ExecHost  string `json:"execHost"`
-	Payload   any    `json:"payload"`
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	HelpUrl string `json:"helpUrl"`
 }
 
-func HttpResponseWriter(w http.ResponseWriter, status int, payload any) {
+const (
+	ErrCodeVersionNotFound = "SYS0001"
+)
+
+type StandardHttpResponse struct {
+	RequestId string  `json:"requestId"`
+	Timestamp string  `json:"timestamp"`
+	ExecHost  string  `json:"execHost,omitempty"`
+	Payload   any     `json:"payload"`
+	Errors    []Error `json:"errors,omitempty"`
+}
+
+func HttpResponseWriter(w http.ResponseWriter, status int, payload any, errors ...Error) {
 	shr := &StandardHttpResponse{
 		RequestId: uuid.New().String(),
 		Timestamp: time.Now().String(),
 		ExecHost:  readExecHost(),
-		Payload:   payload}
+		Payload:   payload,
+		Errors:    errors}
 	resp, err := json.Marshal(shr)
 	if err != nil {
 		fmt.Println(err)
@@ -49,7 +60,7 @@ func HttpResponseWriter(w http.ResponseWriter, status int, payload any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	io.WriteString(w, string(resp))
+	w.Write(resp)
 }
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,12 +77,18 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 func VersionHandler(w http.ResponseWriter, r *http.Request) {
 	responseStatus := http.StatusOK
+	var errors []Error
 	// If the Version struct hasn't been loaded for some reason set responseStatus to NotFound
 	if version == (utils.Version{}) {
 		responseStatus = http.StatusNotFound
+		errors = []Error{{
+			Code:    ErrCodeVersionNotFound,
+			Message: "Version information is not available",
+			HelpUrl: "https://github.com/rakhbari/gomux1/issues",
+		}}
 	}
 	// Responds with the value of the utils.Version struct loaded at app startup
-	HttpResponseWriter(w, responseStatus, &version)
+	HttpResponseWriter(w, responseStatus, &version, errors...)
 }
 
 func readExecHost() string {
