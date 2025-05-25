@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -56,7 +55,7 @@ func HttpResponseWriter(w http.ResponseWriter, status int, apiResp *StandardApiR
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	io.WriteString(w, string(resp))
+	w.Write(resp)
 }
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
